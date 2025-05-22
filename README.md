@@ -1,6 +1,6 @@
 # Dead Drawings: Reviving Data Visualization with AI-Powered Insight Surfacing
 
-A Flask web application for rapid, AI-powered data exploration. Upload CSVs, visualize your data, and surface actionable insights using Google’s Gemini 2.0 Flash model—all in one intuitive interface.
+A Flask web application for rapid, AI-powered data exploration. Upload CSVs, visualize your data, and surface actionable insights using Google’s Gemini 2.0 Flash model all in one intuitive interface.
 
 ---
 
