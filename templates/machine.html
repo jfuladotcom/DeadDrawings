@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Operations Knowledge Graph</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { font-family: 'Roboto', sans-serif; margin: 0; background: #f4f6fa; }
+        .header { background: #2b4855; color: #fff; padding: 1rem 2rem; font-size: 1.5rem; display: flex; align-items: center; justify-content: space-between; position: relative; }
+        .header-title { font-size: 1.5rem; font-weight: bold; }
+        .header-upload {
+            display: flex; align-items: center; gap: 0.5em; position: absolute; right: 2rem; top: 1rem;
+        }
+        .custom-file-upload {
+            display: flex; align-items: center; justify-content: center;          
+            font-size: 1.1rem;
+            width: 400px; height: 48px; border-radius: 8px;
+            cursor: pointer; transition: border-color 0.2s, background 0.2s;
+            text-align: center; position: relative;
+            height: 92.5%;
+            padding:5px 0;
+            border: 2px dotted #fff; color: #fff;
+            transition: .5s all; overflow: hidden;
+        }
+        .custom-file-upload:hover {   border: 2px dotted #e8c36a; color:#e8c36a;}
+        .custom-file-upload input[type="file"] {
+            opacity: 0; position: absolute; left: 0; top: 0; width: 100%; height: 100%; cursor: pointer;
+        }
+        .main { display: flex; width: 100vw; height: calc(100vh - 64px); transition: all 0.3s; }
+        .left-info-panel {
+            width: 0; min-width: 0; overflow: hidden; background: #fff;
+            border-right: 1px solid #e0e0e0; box-shadow: 2px 0 8px rgba(0,0,0,0.03);
+            padding: 2rem 1rem 1rem 1rem; position: relative; transition: width 0.3s;
+            display: flex; flex-direction: column;
+        }
+        .left-info-panel.active { width: 400px; min-width: 320px; overflow: auto; }
+        .info-toggle-btn {
+            position: absolute; right: 0; top: 0; background: #2a3f54; color: #fff;
+             width: 40px; height: 40px; border: none;
+            cursor: pointer; font-size: 1.5rem; z-index: 10; transition: right 0.3s;
+        }
+        .info-content {
+            margin-top: 1rem;  padding: 1rem; border-radius: 6px; min-height: 40px; font-size: 1rem; overflow-x: auto;
+        }
+        #filterControls{display:grid;grid-template-columns:1fr;gap:1rem;margin-top:0.5rem}
+        .filter-group{min-width:0;display:flex;flex-direction:column;align-items:stretch; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);}
+        .filter-title {
+            width: 90%; background: #2a3f54; color: #fff;
+            padding: 0.5em 0.7em; border-radius: 5px; /*! font-weight: bold; */ font-size: 1rem; 
+            cursor: pointer; user-select: none; position: relative; transition: .5s all;
+            /*! border: 1px #2a3f54 solid; */
+        }
+        .filter-title:hover{background: #e66f52;  }
+        .filter-title::after {
+            content: '▼';
+            position: absolute; right: 1em; font-size: 0.9em; transition: transform 0.2s;
+        }
+        .filter-group.collapsed .filter-title::after { transform: rotate(-90deg);}
+        .filter-checkbox-list{display:flex;flex-direction:column;gap:0.2em;background: #f7faff; padding: 0.7em 0.7em 0.7em 0.7em; border-radius: 0 0 4px 4px;}
+        .filter-group.collapsed .filter-checkbox-list,
+        .filter-group.collapsed .filter-group-controls { display: none; }
+        .filter-checkbox-list label{font-weight:normal;font-size:1em;color:#222;display:flex;align-items:center;gap:0.4em;}
+        .filter-group-controls {
+            display: flex; gap: 0.5em; margin-bottom: 0.25em; margin-top: 1.25em; padding-left: 0.7em;
+        }
+        .filter-group-controls button {
+            font-size: 0.95em; padding: 0.2em 0.8em; border-radius: 4px; border: 1px solid #bbb; background: #f0f0f0; color: #333; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .filter-group-controls button:hover { background: #e0e0e0; }
+        .reset-filters-btn {margin-top:0; background:#2b4855; color:#fff; border:none; border-radius:4px; padding:0.5rem 1rem; cursor:pointer;}
+        .left-panel { flex: 1 1 0%; min-width: 0; transition: flex-basis 0.3s, width 0.3s; display: flex; flex-direction: column; padding: 2rem; overflow: auto; }
+        #graphContainer { flex: 1; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.07);  min-height: 0; min-width: 0; height: 100%; display: flex; align-items: stretch; justify-content: stretch; }
+        svg.knowledge-graph { width: 100%; height: 100%; min-width: 0; min-height: 0; display: block; }
+        .right-panel { width: 0; min-width: 0; height: 92%; overflow: hidden; background: #fff; border-left: 1px solid #e0e0e0; box-shadow: -2px 0 8px rgba(0,0,0,0.03); padding: 2rem 1rem 1rem 1rem; position: relative; transition: width 0.3s; }
+        .right-panel.active { width: 400px; min-width: 320px; overflow: auto; }
+        .toggle-btn { position: absolute; left: 0; top: 0; background: #2a3f54; 
+            color: #fff; width: 40px; height: 40px; 
+            border: none; cursor: pointer; font-size: 1.5rem; z-index: 10; transition: left 0.3s; }
+        .prompt-form { display: flex; flex-direction: column; gap: 0.5rem; }
+        .prompt-form textarea { padding: 5px 10px 5px 10px; resize: vertical; min-height: 60px; max-height: 200px; font-size: 1rem;  }
+        .prompt-form button { background: #2a3f54; color: #fff; border: none; border-radius: 4px; padding: 0.75rem; font-size: 1rem; cursor: pointer; }
+        
+        .ai-response { line-height: 1.5em; height: 80%;  border-radius: 6px; min-height: 40px; font-size: 1rem; overflow-x: auto; }
+        
+        .node.highlight circle { stroke: #ff9800; stroke-width: 3px; }
+        .link.highlight { stroke: #ff9800; stroke-width: 2.5px; }
+        .node.faded { opacity: 0.15 !important; }
+        .link.faded { opacity: 0.08 !important; }
+        .node text { fill: #000 !important; stroke: none !important; font-size: 12px; pointer-events: none; }
+        .filter-global-controls { display: flex; gap: 0.5em; align-items: center; margin-bottom: 1em; }
+        .filter-global-controls button { margin-top: 0; }
+        @media (max-width: 900px) {
+            .main { flex-direction: column; }
+            .right-panel.active { width: 100vw; min-width: 0; }
+            .toggle-btn { left: 50%; transform: translateX(-50%); top: -40px; border-radius: 20px 20px 0 0; }
+            .left-info-panel.active { width: 100vw; min-width: 0; }
+        }
+        button{ color:#fff; font-weight: 100; background:#2b4855; transition: .5s all; font-size: 1rem; }
+        button:hover{  font-weight: 100; background:#e66f52; }
+         /* Overlay styles */
+         #overlay { position: fixed;  width: 100%; height: 100%; top: 0; left: 0; background-color: rgba(0,0,0,0.75); z-index: 1000; cursor: pointer;  }  
+         #overlay-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; color: white; text-align: center; transition: .5s all; }
+    </style>
+</head>
+<body>
+    
+  <div id="overlay">
+    <div id="overlay-content">
+           <label for="csvFile" class="custom-file-upload" id="customFileUpload">
+            <span id="fileUploadText">Click here to upload a CSV file</span>
+            <input type="file" id="csvFile" accept=".csv">
+        </label>
+        <span id="uploadStatus"></span>
+    </div>
+  </div>
+
+<div class="header">
+    <span class="header-title">AI Operations Knowledge Graph</span>
+    <div class="header-upload">
+        
+    </div>
+</div>
+<div class="main">
+    <div class="left-info-panel active" id="leftInfoPanel">
+        <button class="info-toggle-btn" id="infoToggleBtn" aria-expanded="true" aria-controls="leftInfoPanel">&#9776;</button>
+        <div id="filterPanelInInfo" class="filterPanelInInfo">
+            <div class="filter-global-controls">
+                <!-- <button id="expandAllFilters" class="reset-filters-btn" style="background:#e66f52;">Expand All</button>
+                <button id="collapseAllFilters" class="reset-filters-btn" style="background:#e8c36a;">Collapse All</button>
+                <button id="resetFilters" class="reset-filters-btn">Reset Filters</button> -->
+               
+                <button id="toggleAllFilters" class="reset-filters-btn" ></button>
+                <button id="resetFilters"  class="reset-filters-btn">Reset Filters</button>
+                <!-- ... your filter groups ... -->
+
+            </div>
+            <div id="filterControls">
+                 <div class="info-content" id="infoContent"></div>
+            </div>
+        </div>
+       
+    </div>
+    <div class="left-panel" id="leftPanel">
+        <div id="graphContainer">
+            <svg id="knowledgeGraph" class="knowledge-graph"></svg>
+        </div>
+    </div>
+    <div class="right-panel active" id="rightPanel">
+        <button class="toggle-btn" id="aiToggleBtn" aria-expanded="true" aria-controls="rightPanel">&#9776;</button>
+         <div id="aiResponse" class="ai-response">
+            <div id="insight" style=" background:#fff; line-height: 1.5em; padding:10px; border-radius:5px;"></div>
+         </div>
+        <div class="ai-prompt-form" id="aipromptform" >
+          
+            <form id="promptForm" class="prompt-form" style="margin-top:1em;">
+                <textarea id="promptInput" rows="4" placeholder="Ask a question about this dataset..."></textarea>
+                <button type="submit">Submit</button>
+            </form>
+           
+        </div>
+    </div>
+</div>
+<script>
+let rawData = [];
+let filteredData = [];
+let filters = {};
+let filterMeta = {};
+let dataKey = "";
+
+// Panel toggles
+const leftInfoPanel = document.getElementById('leftInfoPanel');
+const rightPanel = document.getElementById('rightPanel');
+const infoToggleBtn = document.getElementById('infoToggleBtn');
+const aiToggleBtn = document.getElementById('aiToggleBtn');
+
+const filterPanelInInfo = document.getElementById('filterPanelInInfo');
+const infoContent = document.getElementById('infoContent');
+
+const aiResponse = document.getElementById('aiToggleBtn');
+const aipromptform = document.getElementById('aipromptform');
+
+ infoToggleBtn.style.display = "none";
+ aiToggleBtn.style.display = "none";
+
+leftInfoPanel.classList.add('active');
+rightPanel.classList.add('active');
+infoToggleBtn.setAttribute('aria-expanded', true);
+aiToggleBtn.setAttribute('aria-expanded', true);
+infoToggleBtn.onclick = () => {
+    const expanded = leftInfoPanel.classList.toggle('active');
+    infoToggleBtn.setAttribute('aria-expanded', expanded);
+    infoToggleBtn.innerHTML = expanded ? '&#9776;' : '&#8592;';
+   
+};
+aiToggleBtn.onclick = () => {
+    const expanded = rightPanel.classList.toggle('active');
+    aiToggleBtn.setAttribute('aria-expanded', expanded);
+    aiToggleBtn.innerHTML = expanded ? '&#9776;' : '&#8594;';
+   
+};
+
+const csvFileInput = document.getElementById('csvFile');
+const fileUploadText = document.getElementById('fileUploadText');
+const uploadStatus = document.getElementById('uploadStatus');
+const overlay = document.getElementById('overlay');
+
+csvFileInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    fileUploadText.textContent = file.name;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    uploadStatus.textContent = "Uploading...";
+    fetch('/upload-csv', { method: 'POST', body: formData })
+        .then(resp => resp.json())
+        .then(res => {
+            if (res.key) {
+                dataKey = res.key;
+                uploadStatus.textContent = "";
+                overlay.style.width = '200px';
+                overlay.style.height = '100px';
+                overlay.style.top = '-18px';
+                overlay.style.left = '45%';                
+                overlay.style.background = 'rgba(0,0,0,0)';
+                fetchDataAndRenderCharts(dataKey);
+                fetchAiInsight(dataKey); // <-- Auto-run Gemini prompt here!
+            } else {
+                uploadStatus.textContent = res.error || "Upload failed.";
+            }
+        })
+        .catch(() => {
+            uploadStatus.textContent = "Upload failed.";
+        });
+});
+
+function fetchAiInsight(key) {
+    // Show a loading message or spinner if you like
+    const insightDiv = document.getElementById('insight');
+    if (insightDiv) insightDiv.textContent = "Analyzing data and generating insights...";
+
+    fetch('/ai_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            prompt: "Please provide a concise summary and key insights about this dataset.",
+            key: key
+        })
+    })
+    .then(resp => resp.json())
+    .then(res => {
+        if (insightDiv) {
+            insightDiv.innerHTML = res.response || "No insight generated.";
+        }
+    })
+    .catch(() => {
+        if (insightDiv) insightDiv.textContent = "Failed to get AI insight.";
+    });
+}
+
+// Fetch data from backend after upload
+function fetchDataAndRenderCharts(key) {
+    fetch(`/get-csv-data?key=${encodeURIComponent(key)}`)
+        .then(resp => resp.json())
+        .then(res => {
+            if (Array.isArray(res.data) && res.data.length) {
+                rawData = res.data;
+                setupFilters(rawData);
+                applyFilters();
+            } else {
+                uploadStatus.textContent = "CSV data error.";
+            }
+        })
+        .catch(() => {
+            uploadStatus.textContent = "Error loading data.";
+        });
+}
+
+function setupFilters(data) {
+    filterMeta = {};
+    filters = {};
+    if (!data.length) return;
+    const columns = Object.keys(data[0]);
+    columns.forEach(field => {
+        const vals = Array.from(new Set(data.map(d => d[field])));
+        filterMeta[field] = vals;
+        filters[field] = [...vals];
+    });
+    renderFilterControls();
+}
+function renderFilterControls() {
+    const container = document.getElementById('filterControls');
+    container.innerHTML = '';
+    Object.keys(filterMeta).forEach(field => {
+        const checkboxes = filterMeta[field].map(opt => {
+            const checked = filters[field].includes(opt) ? 'checked' : '';
+            const checkboxId = `chk_${field.replace(/\s/g, '_')}_${String(opt).replace(/\s/g, '_').replace(/[^a-zA-Z0-9_]/g,'')}`;
+            return `<label><input type="checkbox" id="${checkboxId}" value="${opt}" ${checked}>${opt}</label>`;
+        }).join('');
+        const html = `
+          <div class="filter-group" data-field="${field}">
+            <div class="filter-title" tabindex="0">${field}</div>
+            <div class="filter-group-controls">
+                <button type="button" class="select-all-btn">Select All</button>
+                <button type="button" class="deselect-all-btn">Deselect All</button>
+            </div>
+            <div class="filter-checkbox-list" id="chklist_${field.replace(/\s/g, '_')}">
+              ${checkboxes}
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+
+        setTimeout(() => {
+            const groupDiv = container.querySelector(`.filter-group[data-field="${field}"]`);
+            const titleDiv = groupDiv.querySelector('.filter-title');
+            titleDiv.onclick = () => {
+                groupDiv.classList.toggle('collapsed');
+            };
+            titleDiv.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    groupDiv.classList.toggle('collapsed');
+                }
+            };
+            const listDiv = document.getElementById(`chklist_${field.replace(/\s/g, '_')}`);
+            listDiv.querySelectorAll('input[type=checkbox]').forEach(box => {
+                box.onchange = () => {
+                    filters[field] = Array.from(listDiv.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+                    applyFilters();
+                };
+            });
+            groupDiv.querySelector('.select-all-btn').onclick = () => {
+                listDiv.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = true; });
+                filters[field] = filterMeta[field].slice();
+                applyFilters();
+            };
+            groupDiv.querySelector('.deselect-all-btn').onclick = () => {
+                listDiv.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
+                filters[field] = [];
+                applyFilters();
+            };
+        }, 0);
+    });
+}
+
+// Expand/collapse all logic
+// Start with all filter groups collapsed
+// Ensure all filter groups are collapsed on page load
+// On load, all filter groups are expanded (no .collapsed class)
+const toggleBtn = document.getElementById('toggleAllFilters');
+toggleBtn.textContent = 'Collapse All Filters'; // Initial state: expanded
+toggleBtn.onclick = function() {
+    const groups = document.querySelectorAll('.filter-group');
+    // If any group is expanded (not collapsed), collapse all
+    const anyExpanded = Array.from(groups).some(group => !group.classList.contains('collapsed'));
+    if (anyExpanded) {
+        groups.forEach(group => group.classList.add('collapsed'));
+        toggleBtn.textContent = 'Expand All Filters';
+    } else {
+        groups.forEach(group => group.classList.remove('collapsed'));
+        toggleBtn.textContent = 'Collapse All Filters';
+    }
+};
+
+document.getElementById('resetFilters').onclick = () => {
+    setupFilters(rawData);
+    applyFilters();
+};
+
+
+
+
+function applyFilters() {
+    filteredData = rawData.filter(d => {
+        return Object.keys(filters).every(field => filters[field].includes(d[field]));
+    });
+    renderKnowledgeGraph(filteredData);
+}
+
+// Interactive Knowledge Graph
+function renderKnowledgeGraph(data) {
+    if (!data.length) {
+        d3.select("#knowledgeGraph").selectAll("*").remove();
+        return;
+    }
+    const columns = Object.keys(data[0]);
+    const valueNodes = {};
+    const nodes = [];
+    const links = [];
+
+    // 1. Create value nodes (one per unique value per column)
+    columns.forEach(col => {
+        const uniqueVals = Array.from(new Set(data.map(d => d[col])));
+        uniqueVals.forEach(val => {
+            const id = `${col}:${val}`;
+            if (!valueNodes[id]) {
+                valueNodes[id] = { id, label: val, group: col, type: 'value' };
+                nodes.push(valueNodes[id]);
+            }
+        });
+    });
+
+    // 2. Create row nodes and links to value nodes
+    data.forEach((row, i) => {
+        const rowNode = { id: `Row:${i+1}`, label: `Row ${i+1}`, type: 'Row', index: i+1 };
+        nodes.push(rowNode);
+        columns.forEach(col => {
+            const val = row[col];
+            const valueNodeId = `${col}:${val}`;
+            if (valueNodes[valueNodeId]) {
+                links.push({
+                    source: rowNode.id,
+                    target: valueNodeId,
+                    label: col
+                });
+            }
+        });
+    });
+
+    let selectedNodeId = null;
+    let neighborSet = new Set();
+
+    // Responsive SVG sizing
+    const container = document.getElementById('graphContainer');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const svg = d3.select("#knowledgeGraph")
+        .attr("width", width)
+        .attr("height", height);
+    svg.selectAll("*").remove();
+
+    // Zoom and pan
+    const zoom = d3.zoom()
+        .scaleExtent([0.2, 2])
+        .on("zoom", (event) => {
+            g.attr("transform", event.transform);
+        });
+    svg.call(zoom);
+
+    const g = svg.append("g");
+
+    const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(80))
+        .force("charge", d3.forceManyBody().strength(-120))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(30));
+
+    const link = g.append("g")
+        .attr("stroke", "#aaa")
+        .attr("stroke-opacity", 0.6)
+        .selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("stroke-width", 1)
+        .attr("class", "link");
+
+    const node = g.append("g")
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 1.5)
+        .selectAll("g")
+        .data(nodes)
+        .join("g")
+        .attr("class", "node")
+        .call(drag(simulation));
+
+    node.append("circle")
+        .attr("r", d => d.type === "row" ? 10 : 7)
+        .attr("fill", d => d.type === "row" ? "#e66f52" : d3.schemeCategory10[columns.indexOf(d.group) % 10])
+        .on("mouseover", function(event, d) {
+            if (selectedNodeId) return;
+            highlightNode(d, true);
+        })
+        .on("mouseout", function(event, d) {
+            if (selectedNodeId) return;
+            highlightNode(d, false);
+        })
+        .on("click", function(event, d) {
+            const connectedLinks = links.filter(l => l.source.id === d.id || l.target.id === d.id);
+            let content = "";
+            if (d.type === "row") {
+                const rowData = data[d.index-1];
+                content += `<strong>Row: ${d.index}</strong><br>`;
+                content += Object.entries(rowData).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join("<br>");
+                content += `<hr><strong>Connections (${connectedLinks.length}):</strong><ul style="padding-left:1.2em;">`;
+                connectedLinks.forEach(link => {
+                    const neighbor = link.source.id === d.id ? link.target : link.source;
+                    content += `<li><strong>${neighbor.group}:</strong> <span style="color:#e66f52">${neighbor.label}</span></li>`;
+                });
+                content += `</ul>`;
+            } else {
+                content += `<strong>${d.group}: ${d.label}</strong><br>`;
+                content += `<em>Connected Rows (${connectedLinks.length}):</em><ul style="padding-left:1.2em;">`;
+                connectedLinks.forEach(link => {
+                    const neighbor = link.source.id === d.id ? link.target : link.source;
+                    if (neighbor.type === "row") {
+                        content += `<li>${neighbor.label}</li>`;
+                    }
+                });
+                content += `</ul>`;
+            }
+            infoContent.innerHTML = content;
+
+            // Highlight logic
+            if (selectedNodeId === d.id) {
+                selectedNodeId = null;
+                neighborSet = new Set();
+                highlightNode(null, false);
+                return;
+            }
+            selectedNodeId = d.id;
+            neighborSet = new Set();
+            connectedLinks.forEach(link => {
+                const neighbor = link.source.id === d.id ? link.target : link.source;
+                neighborSet.add(neighbor.id);
+            });
+            highlightNode(d, true);
+        });
+
+    node.append("title")
+        .text(d => d.type === "row" ? d.label : `${d.group}: ${d.label}`);
+
+    node.append("text")
+        .attr("dy", 3)
+        .attr("x", d => d.type === "row" ? 14 : 10)
+        .text(d => d.type === "row" ? d.label : d.label)
+        .style("font-size", "12px")
+        .style("fill", "#000");
+
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+        node
+            .attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    function drag(simulation) {
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        return d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended);
+    }
+
+    // Highlight node and its direct links, fade others
+    function highlightNode(d, highlight) {
+        if (!highlight || !d) {
+            node.classed("highlight", false).classed("faded", false);
+            link.classed("highlight", false).classed("faded", false);
+            return;
+        }
+        node.classed("highlight", n =>
+            n.id === d.id || neighborSet.has(n.id)
+        ).classed("faded", n =>
+            !(n.id === d.id || neighborSet.has(n.id))
+        );
+        link.classed("highlight", l =>
+            l.source.id === d.id || l.target.id === d.id
+        ).classed("faded", l =>
+            !(l.source.id === d.id || l.target.id === d.id)
+        );
+    }
+
+    svg.on("click", function(event) {
+        if (event.target === svg.node()) {
+            selectedNodeId = null;
+            neighborSet = new Set();
+            highlightNode(null, false);
+            infoContent.innerHTML = "Click a node to see details here.";
+        }
+    });
+}
+
+// AI prompt logic (your original working logic)
+document.getElementById('promptForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt || !dataKey) return;
+    document.getElementById('aiResponse').textContent = "Thinking...";
+    fetch('/ai_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, key: dataKey })
+    })
+    .then(resp => resp.json())
+    .then(res => {
+        document.getElementById('aiResponse').innerHTML = res.response || "No answer.";
+    })
+    .catch(() => {
+        document.getElementById('aiResponse').textContent = "Error contacting Gemini.";
+    });
+});
+</script>
+</body>
+</html>
